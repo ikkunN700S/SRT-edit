@@ -2,6 +2,7 @@ let srtData = [];
 let lastFocusedInput = null;
 let undoStack = [];
 let redoStack = [];
+let isScriptAction = false; 
 
 const mediaPlayer = document.getElementById('mediaPlayer');
 const editor = document.getElementById('editor');
@@ -17,30 +18,49 @@ document.getElementById('undoBtn').addEventListener('click', undoLastAction);
 document.getElementById('redoBtn').addEventListener('click', redoLastAction);
 document.getElementById('downloadBtn').addEventListener('click', downloadSRT);
 
-// 新しい行を追加ボタン
+// 時間テキストを手動入力した際に赤文字のチェックをリアルタイムで行う
+editor.addEventListener('input', (e) => {
+    if (e.target.classList.contains('time-input')) {
+        validateTimeGaps();
+    }
+});
+
+// 新しい行を追加ボタン（前行の終了時間を引き継ぐ）
 document.getElementById('addRowBtn').addEventListener('click', () => {
-    const row = createRowElement(0, '00:00:00,000', '00:00:00,000', '');
+    let insertAfterRow = null;
+    let defaultTime = '00:00:00,000';
+
     if (lastFocusedInput && document.body.contains(lastFocusedInput)) {
-        const currentRow = lastFocusedInput.closest('.srt-row');
-        if (currentRow) {
-            currentRow.after(row);
-        } else {
-            editor.appendChild(row);
+        insertAfterRow = lastFocusedInput.closest('.srt-row');
+    } else {
+        const rows = editor.querySelectorAll('.srt-row');
+        if (rows.length > 0) {
+            insertAfterRow = rows[rows.length - 1];
         }
+    }
+
+    // 前の行が存在すれば終了時間を取得
+    if (insertAfterRow) {
+        defaultTime = insertAfterRow.querySelector('.end-time').value;
+    }
+
+    const row = createRowElement(0, defaultTime, defaultTime, '');
+    
+    if (insertAfterRow && lastFocusedInput && document.body.contains(lastFocusedInput)) {
+        insertAfterRow.after(row);
     } else {
         editor.appendChild(row);
     }
+    
     updateRowIds();
 });
 
-// テキストボックスのフォーカス（選択）の記録
 document.addEventListener('focusin', (e) => {
     if (e.target.tagName === 'INPUT' && e.target.classList.contains('time-input')) {
         lastFocusedInput = e.target;
     }
 });
 
-// 【変更点】行番号（.col-id）をクリックした時の再生シーク機能
 editor.addEventListener('click', (e) => {
     const colIdBtn = e.target.closest('.col-id');
     if (colIdBtn && mediaPlayer.readyState > 0) {
@@ -48,14 +68,12 @@ editor.addEventListener('click', (e) => {
         const startSec = parseTime(row.querySelector('.start-time').value);
         
         mediaPlayer.currentTime = startSec;
-        // クリックしたら自動的に再生を開始する
         if (mediaPlayer.paused) {
             mediaPlayer.play();
         }
     }
 });
 
-// 【変更点】常時表示の再生・一時停止ボタンの制御
 floatingPlayPauseBtn.addEventListener('click', () => {
     if (mediaPlayer.readyState === 0) {
         alert("先に音源または動画ファイルを読み込んでください。");
@@ -71,18 +89,16 @@ floatingPlayPauseBtn.addEventListener('click', () => {
 mediaPlayer.addEventListener('loadedmetadata', () => {
     floatingPlayPauseBtn.disabled = false;
 });
-
 mediaPlayer.addEventListener('play', () => {
     floatingPlayPauseBtn.innerHTML = '<span class="icon">⏸</span> 一時停止';
     floatingPlayPauseBtn.classList.add('playing');
 });
-
 mediaPlayer.addEventListener('pause', () => {
     floatingPlayPauseBtn.innerHTML = '<span class="icon">▶</span> 再生';
     floatingPlayPauseBtn.classList.remove('playing');
 });
 
-// 1. メディア（音声/動画）読み込み
+// ファイル読み込み処理
 function handleMediaUpload(event) {
     const file = event.target.files[0];
     if (file) {
@@ -90,8 +106,6 @@ function handleMediaUpload(event) {
         mediaPlayer.src = url;
     }
 }
-
-// 2. 【変更点】SRT・TXTファイル読み込みの分岐
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -112,7 +126,6 @@ function handleFileUpload(event) {
     reader.readAsText(file);
 }
 
-// SRTの解析
 function parseSRT(content) {
     srtData = [];
     const blocks = content.replace(/\r\n/g, '\n').split(/\n{2,}/);
@@ -127,18 +140,11 @@ function parseSRT(content) {
         }
     });
 }
-
-// 【新規】TXTの解析（空行を保持）
 function parseTXT(content) {
     srtData = [];
-    // ファイル末尾の不要な改行だけを消し、中の空行は残す
     const lines = content.replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n');
     lines.forEach(line => {
-        srtData.push({
-            start: '00:00:00,000',
-            end: '00:00:00,000',
-            text: line // 空行の場合は空文字がセットされる
-        });
+        srtData.push({ start: '00:00:00,000', end: '00:00:00,000', text: line });
     });
 }
 
@@ -148,6 +154,7 @@ function renderEditor() {
         const row = createRowElement(index + 1, data.start, data.end, data.text);
         editor.appendChild(row);
     });
+    validateTimeGaps(); // 描画後にズレのチェックを行う
 }
 
 function createRowElement(id, start = '00:00:00,000', end = '00:00:00,000', text = '') {
@@ -180,11 +187,35 @@ function createRowElement(id, start = '00:00:00,000', end = '00:00:00,000', text
     return div;
 }
 
+// 行番号の更新と、時間のズレ検知を同時に行う
 function updateRowIds() {
     const rows = editor.querySelectorAll('.srt-row');
     rows.forEach((row, index) => {
         row.querySelector('.id-text').textContent = index + 1;
     });
+    validateTimeGaps(); 
+}
+
+// 【新規追加】前行の終了と次行の開始がズレている部分を赤文字にする
+function validateTimeGaps() {
+    const rows = editor.querySelectorAll('.srt-row');
+    
+    // 一度すべての赤文字クラスをリセット
+    rows.forEach(row => {
+        row.querySelector('.start-time').classList.remove('time-mismatch');
+        row.querySelector('.end-time').classList.remove('time-mismatch');
+    });
+
+    // 隣り合う行を比較して、時間が異なっていれば赤文字を適用
+    for (let i = 0; i < rows.length - 1; i++) {
+        const currentEnd = rows[i].querySelector('.end-time');
+        const nextStart = rows[i + 1].querySelector('.start-time');
+        
+        if (currentEnd.value !== nextStart.value) {
+            currentEnd.classList.add('time-mismatch');
+            nextStart.classList.add('time-mismatch');
+        }
+    }
 }
 
 function formatTime(seconds) {
@@ -218,7 +249,7 @@ function flashElement(el, color = '#d4edda') {
     el.style.backgroundColor = '';
 }
 
-// 5. 時間入力と履歴記録ロジック（順次入力方式）
+// 時間入力と履歴記録
 function setTimeToFocusedInput() {
     let targetInput = lastFocusedInput;
 
@@ -242,7 +273,6 @@ function setTimeToFocusedInput() {
         focusAfter: null
     };
 
-    // 時間の入力
     actionHistory.changes.push({ el: targetInput, oldVal: targetInput.value, newVal: formattedTime });
     targetInput.value = formattedTime;
     flashElement(targetInput, '#d4edda');
@@ -251,7 +281,6 @@ function setTimeToFocusedInput() {
     let nextFocusTarget = targetInput;
 
     if (targetInput.classList.contains('start-time')) {
-        // 前の行の終了時間補完
         const prevRow = currentRow.previousElementSibling;
         if (prevRow && prevRow.classList.contains('srt-row')) {
             const prevEnd = prevRow.querySelector('.end-time');
@@ -260,12 +289,12 @@ function setTimeToFocusedInput() {
             flashElement(prevEnd, '#d4edda');
         }
 
-        // 次の行へのフォーカス移動・自動追加
         let nextRow = currentRow.nextElementSibling;
         if (!nextRow || !nextRow.classList.contains('srt-row')) {
-            nextRow = createRowElement(0, '00:00:00,000', '00:00:00,000', '');
+            // 自動追加時も、直前の行（現在の行）の終了時間を引き継ぐ
+            const defaultTime = currentRow.querySelector('.end-time').value;
+            nextRow = createRowElement(0, defaultTime, defaultTime, '');
             currentRow.after(nextRow);
-            updateRowIds();
             actionHistory.addedRowInfo = { row: nextRow, prevSibling: currentRow };
         }
 
@@ -278,20 +307,20 @@ function setTimeToFocusedInput() {
     lastFocusedInput = nextFocusTarget;
     actionHistory.focusAfter = nextFocusTarget;
 
-    // 履歴スタックの更新
     undoStack.push(actionHistory);
     redoStack = [];
     updateUndoRedoButtons();
+    
+    // 入力が完了したタイミングでズレを再計算
+    updateRowIds();
 }
 
-// 6. 「1つ戻る」実行関数
 function undoLastAction() {
     if (undoStack.length === 0) return;
     const lastAction = undoStack.pop();
 
     if (lastAction.addedRowInfo && document.body.contains(lastAction.addedRowInfo.row)) {
         lastAction.addedRowInfo.row.remove();
-        updateRowIds();
     }
 
     lastAction.changes.forEach(change => {
@@ -308,9 +337,9 @@ function undoLastAction() {
 
     redoStack.push(lastAction);
     updateUndoRedoButtons();
+    updateRowIds(); // ID振替とズレ計算
 }
 
-// 7. 「やり直し」実行関数
 function redoLastAction() {
     if (redoStack.length === 0) return;
     const action = redoStack.pop();
@@ -321,7 +350,6 @@ function redoLastAction() {
         } else {
             editor.appendChild(action.addedRowInfo.row);
         }
-        updateRowIds();
     }
 
     action.changes.forEach(change => {
@@ -338,6 +366,7 @@ function redoLastAction() {
 
     undoStack.push(action);
     updateUndoRedoButtons();
+    updateRowIds(); // ID振替とズレ計算
 }
 
 function updateUndoRedoButtons() {
@@ -345,7 +374,6 @@ function updateUndoRedoButtons() {
     redoBtn.disabled = redoStack.length === 0;
 }
 
-// 8. プレビュー機能（再生時間に応じたハイライト）
 mediaPlayer.addEventListener('timeupdate', () => {
     const currentSec = mediaPlayer.currentTime;
     const rows = editor.querySelectorAll('.srt-row');
@@ -364,7 +392,6 @@ mediaPlayer.addEventListener('timeupdate', () => {
     });
 });
 
-// 9. SRTファイルの生成とダウンロード
 function downloadSRT() {
     const rows = editor.querySelectorAll('.srt-row');
     if (rows.length === 0) {
@@ -377,7 +404,6 @@ function downloadSRT() {
     rows.forEach((row, index) => {
         const start = row.querySelector('.start-time').value.trim() || '00:00:00,000';
         const end = row.querySelector('.end-time').value.trim() || '00:00:00,000';
-        // 空行の場合は全角スペース（または半角スペース）として出力（SRT仕様のため）
         const text = row.querySelector('.text-input').value || ' '; 
 
         srtOutput += `${index + 1}\n`;
