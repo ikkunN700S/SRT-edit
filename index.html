@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT同期歌詞エディタ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>SRT同期歌詞エディタ</h1>
+
+        <div class="control-panel">
+            <div class="panel-section">
+                <h3>1. 音源・動画の読み込み (時間設定用)</h3>
+                <input type="file" id="mediaInput" accept="audio/*,video/*">
+                <audio id="mediaPlayer" controls></audio>
+            </div>
+            <div class="panel-section">
+                <h3>2. 歌詞ファイル（SRT / TXT）の読み込み</h3>
+                <input type="file" id="srtInput" accept=".srt,.txt,text/plain">
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    ※TXTファイルは1行ずつ改行を保持して読み込まれます。
+                </p>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button id="addRowBtn" class="btn-secondary">＋ 新しい行を追加</button>
+            <div class="toolbar-right">
+                <button id="undoBtn" class="btn-secondary" disabled>↩ 戻る</button>
+                <button id="redoBtn" class="btn-secondary" disabled>↪ やり直し</button>
+            </div>
+        </div>
+
+        <div class="editor-header">
+            <span class="col-id-header">No.</span>
+            <span class="col-time">開始時間</span>
+            <span class="col-time">終了時間</span>
+            <span class="col-text">歌詞・テキスト</span>
+            <span class="col-action">操作</span>
+        </div>
+        
+        <div id="editor" class="editor-container">
+            <!-- ここにSRTの行データが追加されます -->
+        </div>
+
+        <div class="export-section">
+            <button id="downloadBtn" class="btn-success">💾 SRTファイルをダウンロード</button>
+        </div>
+    </div>
+
+    <!-- 画面下部中央の巨大な時間入力ボタン -->
+    <div class="floating-center">
+        <button id="setTimeBtn" class="btn-large-time">⏰ 時間を入力 (次へ進む)</button>
+    </div>
+
+    <!-- 常に画面に表示される再生/一時停止ボタン -->
+    <div class="floating-controls">
+        <button id="floatingPlayPauseBtn" class="btn-primary" disabled>
+            <span class="icon">▶</span> 再生
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
