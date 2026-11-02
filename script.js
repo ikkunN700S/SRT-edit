@@ -1,14 +1,17 @@
 let srtData = [];
 let lastFocusedInput = null;
+let undoStack = []; // 元に戻すための履歴スタック
 
 const mediaPlayer = document.getElementById('mediaPlayer');
 const editor = document.getElementById('editor');
+const undoBtn = document.getElementById('undoBtn');
 
 // イベントリスナーの登録
 document.getElementById('mediaInput').addEventListener('change', handleMediaUpload);
 document.getElementById('srtInput').addEventListener('change', handleSRTUpload);
 document.getElementById('addRowBtn').addEventListener('click', () => addRow());
 document.getElementById('setTimeBtn').addEventListener('click', setTimeToFocusedInput);
+document.getElementById('undoBtn').addEventListener('click', undoLastAction);
 document.getElementById('downloadBtn').addEventListener('click', downloadSRT);
 
 // フォーカスされたテキストボックスを記憶する
@@ -36,17 +39,22 @@ function handleSRTUpload(event) {
     reader.onload = (e) => {
         parseSRT(e.target.result);
         renderEditor();
+        // 新しいファイルを読み込んだら履歴をリセット
+        undoStack = [];
+        updateUndoButton();
     };
     reader.readAsText(file);
 }
 
 function parseSRT(content) {
     srtData = [];
-    const blocks = content.replace(/\r\n/g, '\n').split('\n\n');
+    // 改行の正規化と、空行を考慮してブロック分割
+    const blocks = content.replace(/\r\n/g, '\n').split(/\n{2,}/);
     
     blocks.forEach(block => {
         const lines = block.trim().split('\n');
-        if (lines.length >= 3) {
+        // 空行（テキストなし）の場合は番号と時間の2行だけになるため「2行以上」を条件にする
+        if (lines.length >= 2) {
             const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s-->\s(\d{2}:\d{2}:\d{2},\d{3})/);
             if (timeMatch) {
                 const text = lines.slice(2).join('\n');
@@ -99,6 +107,7 @@ function addRow(start = '00:00:00,000', end = '00:00:00,000', text = '') {
     const nextId = editor.children.length + 1;
     const row = createRowElement(nextId, start, end, text);
     editor.appendChild(row);
+    return row; // 追加された行要素を返す
 }
 
 function updateRowIds() {
@@ -108,7 +117,6 @@ function updateRowIds() {
     });
 }
 
-// 4. 秒数をSRTのHH:MM:SS,MMM形式に変換
 function formatTime(seconds) {
     if (isNaN(seconds)) return '00:00:00,000';
     const h = Math.floor(seconds / 3600);
@@ -118,7 +126,6 @@ function formatTime(seconds) {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
 }
 
-// SRTのHH:MM:SS,MMM形式を秒数に変換（ハイライト計算用）
 function parseTime(timeStr) {
     if (!timeStr) return 0;
     const parts = timeStr.split(',');
@@ -134,7 +141,7 @@ function parseTime(timeStr) {
     return h + m + s + ms;
 }
 
-// 5. ボタン押下時の時間入力ロジック（連続移動＆自動補完対応）
+// 5. 時間入力と「元に戻す」記録ロジック
 function setTimeToFocusedInput() {
     if (!lastFocusedInput || !document.body.contains(lastFocusedInput)) {
         alert("時間を入力したいテキストボックスを一度クリックして選択してください。");
@@ -144,47 +151,81 @@ function setTimeToFocusedInput() {
     const currentTime = mediaPlayer.currentTime || 0;
     const formattedTime = formatTime(currentTime);
     
-    // 選択中のボックスに時間を入力
+    // アンドゥ用の状態保存オブジェクト
+    const actionHistory = {
+        changes: [], // 値が変更されたinputの配列 {element: el, oldVal: string}
+        addedRow: null, // 自動追加された行がある場合はその参照
+        focusTarget: lastFocusedInput // 操作前にフォーカスがあった場所
+    };
+
+    // 選択中のボックスの変更を記録
+    actionHistory.changes.push({ el: lastFocusedInput, oldVal: lastFocusedInput.value });
     lastFocusedInput.value = formattedTime;
     
     // 入力時の視覚的フィードバック
     const originalBg = lastFocusedInput.style.backgroundColor;
     lastFocusedInput.style.backgroundColor = '#d4edda';
-    setTimeout(() => {
-        lastFocusedInput.style.backgroundColor = originalBg;
-    }, 300);
+    setTimeout(() => { lastFocusedInput.style.backgroundColor = originalBg; }, 300);
 
     const currentRow = lastFocusedInput.closest('.srt-row');
 
-    // 「開始時間」のボックスだった場合の処理
     if (lastFocusedInput.classList.contains('start-time')) {
-        
-        // 1. 前の行があれば、前の行の終了時間に同じ時間を自動入力する
+        // 1. 前の行の終了時間補完
         const prevRow = currentRow.previousElementSibling;
         if (prevRow && prevRow.classList.contains('srt-row')) {
             const prevEnd = prevRow.querySelector('.end-time');
+            actionHistory.changes.push({ el: prevEnd, oldVal: prevEnd.value });
             prevEnd.value = formattedTime;
         }
 
-        // 2. 次の行の開始時間へフォーカスを自動で移す
+        // 2. 次の行へのフォーカス移動・自動追加
         let nextRow = currentRow.nextElementSibling;
-        
-        // 次の行がない場合は新しい行を自動的に追加する
         if (!nextRow || !nextRow.classList.contains('srt-row')) {
-            addRow();
-            nextRow = currentRow.nextElementSibling;
+            nextRow = addRow();
+            actionHistory.addedRow = nextRow; // 自動追加されたことを記録
         }
 
         if (nextRow) {
             const nextStart = nextRow.querySelector('.start-time');
             nextStart.focus();
         }
-        
     } 
-    // 「終了時間」のボックスだった場合は単独更新のみ（次の行はいじらずフォーカス移動もしない）
-    else if (lastFocusedInput.classList.contains('end-time')) {
-        // 何もしない
+
+    // 履歴スタックに追加
+    undoStack.push(actionHistory);
+    updateUndoButton();
+}
+
+// 「1つ戻る」実行関数
+function undoLastAction() {
+    if (undoStack.length === 0) return;
+    
+    const lastAction = undoStack.pop();
+
+    // 1. 自動追加された行があれば削除
+    if (lastAction.addedRow && document.body.contains(lastAction.addedRow)) {
+        lastAction.addedRow.remove();
+        updateRowIds();
     }
+
+    // 2. 変更されたテキストボックスの値を元の値に戻す
+    lastAction.changes.forEach(change => {
+        if (document.body.contains(change.el)) {
+            change.el.value = change.oldVal;
+        }
+    });
+
+    // 3. フォーカスを元の位置に戻す
+    if (lastAction.focusTarget && document.body.contains(lastAction.focusTarget)) {
+        lastAction.focusTarget.focus();
+    }
+
+    updateUndoButton();
+}
+
+// 戻るボタンの有効/無効の切り替え
+function updateUndoButton() {
+    undoBtn.disabled = undoStack.length === 0;
 }
 
 // 6. プレビュー機能（再生時間に応じたハイライト）
@@ -198,7 +239,6 @@ mediaPlayer.addEventListener('timeupdate', () => {
         const startSec = parseTime(startStr);
         const endSec = parseTime(endStr);
         
-        // 開始時間と終了時間の間に現在時間がある場合にハイライト
         if (startSec <= currentSec && currentSec < endSec) {
             row.classList.add('highlight');
         } else {
