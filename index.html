@@ -17,8 +17,12 @@
                 <audio id="mediaPlayer" controls></audio>
             </div>
             <div class="panel-section">
-                <h3>2. 既存SRTファイルの読み込み</h3>
-                <input type="file" id="srtInput" accept=".srt">
+                <h3>2. 歌詞ファイル（SRT / TXT）の読み込み</h3>
+                <!-- txtファイルも許容するようにacceptを変更 -->
+                <input type="file" id="srtInput" accept=".srt,.txt,text/plain">
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    ※TXTファイルは1行ずつ改行を保持して読み込まれます。
+                </p>
             </div>
         </div>
 
@@ -32,7 +36,7 @@
         </div>
 
         <div class="editor-header">
-            <span class="col-id">No.</span>
+            <span class="col-id-header">No.</span>
             <span class="col-time">開始時間</span>
             <span class="col-time">終了時間</span>
             <span class="col-text">歌詞・テキスト</span>
@@ -47,6 +51,14 @@
             <button id="downloadBtn" class="btn-success">💾 SRTファイルをダウンロード</button>
         </div>
     </div>
+
+    <!-- 常に画面に表示される再生/一時停止ボタン -->
+    <div class="floating-controls">
+        <button id="floatingPlayPauseBtn" class="btn-primary" disabled>
+            <span class="icon">▶</span> 再生
+        </button>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@ body {
     padding: 20px 30px;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 80px; /* フローティングボタンと被らないように余白 */
 }
 
 h1 {
@@ -80,7 +81,7 @@ button {
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
-    transition: opacity 0.2s;
+    transition: all 0.2s;
 }
 
 button:hover:not(:disabled) { opacity: 0.8; }
@@ -97,6 +98,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     padding: 10px;
     background: #e9ecef;
     border-radius: 4px 4px 0 0;
+    align-items: center;
 }
 
 .srt-row {
@@ -113,7 +115,40 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     border-left: 4px solid #ffc107;
 }
 
-.col-id { width: 40px; text-align: center; font-weight: bold; color: #666; }
+/* 行番号ヘッダー用 */
+.col-id-header { width: 50px; text-align: center; font-weight: bold; color: #666; }
+
+/* 再生ボタンになる行番号のスタイル */
+.col-id { 
+    width: 50px; 
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold; 
+    color: #495057; 
+    background-color: #e9ecef;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.col-id .play-icon {
+    display: none;
+    font-size: 14px;
+}
+
+.col-id:hover {
+    background-color: var(--primary-color);
+    color: white;
+    transform: scale(1.05);
+}
+
+.col-id:hover .id-text { display: none; }
+.col-id:hover .play-icon { display: block; }
+
+
 .col-time { width: 130px; }
 .col-text { flex: 1; }
 .col-action { width: 60px; text-align: center; }
@@ -139,4 +174,33 @@ input[type="text"]:focus {
 
 .export-section {
     margin-top: 30px;
+}
+
+/* 常時表示の再生・一時停止ボタン */
+.floating-controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border-radius: 50px;
+}
+
+#floatingPlayPauseBtn {
+    border-radius: 50px;
+    padding: 15px 30px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+#floatingPlayPauseBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,123,255,0.3);
+}
+
+#floatingPlayPauseBtn.playing {
+    background-color: #ff9800; /* 再生中はオレンジ色にして目立たせる */
 }
