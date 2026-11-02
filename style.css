@@ -22,7 +22,8 @@ body {
     padding: 20px 30px;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    margin-bottom: 80px; 
+    /* 巨大ボタンに最下部の行が隠れないように余白をかなり大きめに確保 */
+    margin-bottom: 150px; 
 }
 
 h1 {
@@ -170,7 +171,6 @@ input[type="text"]:focus {
     background-color: #f8fbff;
 }
 
-/* 時間のズレを警告する赤文字クラス */
 input.time-mismatch {
     color: var(--danger-color);
     font-weight: bold;
@@ -180,6 +180,7 @@ input.time-mismatch {
     margin-top: 30px;
 }
 
+/* 画面右下の再生・一時停止ボタン */
 .floating-controls {
     position: fixed;
     bottom: 20px;
@@ -206,4 +207,30 @@ input.time-mismatch {
 
 #floatingPlayPauseBtn.playing {
     background-color: #ff9800; 
+}
+
+.floating-center {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+}
+
+.btn-large-time {
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 50px;
+    padding: 20px 40px;
+    font-size: 20px;
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+}
+
+.btn-large-time:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.5);
+}
+
+.btn-large-time:active {
+    transform: scale(0.95);
 }
