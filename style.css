@@ -99,6 +99,13 @@ button:hover { opacity: 0.8; }
     padding: 10px;
     border-bottom: 1px solid var(--border-color);
     gap: 10px;
+    transition: background-color 0.2s;
+}
+
+/* プレビュー時のハイライト用スタイル */
+.srt-row.highlight {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
 }
 
 .col-id { width: 40px; text-align: center; font-weight: bold; color: #666; }
@@ -120,7 +127,6 @@ input.time-input {
     text-align: center;
 }
 
-/* 選択中のテキストボックスをハイライトして分かりやすくする */
 input[type="text"]:focus {
     outline: none;
     border-color: var(--primary-color);

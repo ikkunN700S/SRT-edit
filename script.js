@@ -11,7 +11,7 @@ document.getElementById('addRowBtn').addEventListener('click', () => addRow());
 document.getElementById('setTimeBtn').addEventListener('click', setTimeToFocusedInput);
 document.getElementById('downloadBtn').addEventListener('click', downloadSRT);
 
-// フォーカスされたテキストボックス（時間入力用）を記憶する
+// フォーカスされたテキストボックスを記憶する
 document.addEventListener('focusin', (e) => {
     if (e.target.classList.contains('time-input')) {
         lastFocusedInput = e.target;
@@ -40,10 +40,8 @@ function handleSRTUpload(event) {
     reader.readAsText(file);
 }
 
-// SRT形式のテキストを解析
 function parseSRT(content) {
     srtData = [];
-    // 改行コードを統一して空行でブロックごとに分割
     const blocks = content.replace(/\r\n/g, '\n').split('\n\n');
     
     blocks.forEach(block => {
@@ -51,7 +49,6 @@ function parseSRT(content) {
         if (lines.length >= 3) {
             const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3})\s-->\s(\d{2}:\d{2}:\d{2},\d{3})/);
             if (timeMatch) {
-                // 3行目以降をテキストとして結合（空行だけの字幕も保持）
                 const text = lines.slice(2).join('\n');
                 srtData.push({
                     start: timeMatch[1],
@@ -63,7 +60,6 @@ function parseSRT(content) {
     });
 }
 
-// 3. 画面にエディタ行を描画
 function renderEditor() {
     editor.innerHTML = '';
     srtData.forEach((data, index) => {
@@ -72,7 +68,6 @@ function renderEditor() {
     });
 }
 
-// 行要素の生成
 function createRowElement(id, start = '00:00:00,000', end = '00:00:00,000', text = '') {
     const div = document.createElement('div');
     div.className = 'srt-row';
@@ -92,7 +87,6 @@ function createRowElement(id, start = '00:00:00,000', end = '00:00:00,000', text
         </div>
     `;
 
-    // 削除ボタンの処理
     div.querySelector('.delete-btn').addEventListener('click', () => {
         div.remove();
         updateRowIds();
@@ -101,14 +95,12 @@ function createRowElement(id, start = '00:00:00,000', end = '00:00:00,000', text
     return div;
 }
 
-// 行の追加
 function addRow(start = '00:00:00,000', end = '00:00:00,000', text = '') {
     const nextId = editor.children.length + 1;
     const row = createRowElement(nextId, start, end, text);
     editor.appendChild(row);
 }
 
-// 行番号の振り直し（削除時）
 function updateRowIds() {
     const rows = editor.querySelectorAll('.srt-row');
     rows.forEach((row, index) => {
@@ -119,33 +111,103 @@ function updateRowIds() {
 // 4. 秒数をSRTのHH:MM:SS,MMM形式に変換
 function formatTime(seconds) {
     if (isNaN(seconds)) return '00:00:00,000';
-    
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 1000);
-
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
 }
 
-// ボタンを押した時、選択中のテキストボックスに現在時間を入力
+// SRTのHH:MM:SS,MMM形式を秒数に変換（ハイライト計算用）
+function parseTime(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(',');
+    if (parts.length !== 2) return 0;
+    const hms = parts[0].split(':');
+    if (hms.length !== 3) return 0;
+    
+    const h = parseInt(hms[0], 10) * 3600;
+    const m = parseInt(hms[1], 10) * 60;
+    const s = parseInt(hms[2], 10);
+    const ms = parseInt(parts[1], 10) / 1000;
+    
+    return h + m + s + ms;
+}
+
+// 5. ボタン押下時の時間入力ロジック（連続移動＆自動補完対応）
 function setTimeToFocusedInput() {
-    if (lastFocusedInput && document.body.contains(lastFocusedInput)) {
-        const currentTime = mediaPlayer.currentTime || 0;
-        lastFocusedInput.value = formatTime(currentTime);
+    if (!lastFocusedInput || !document.body.contains(lastFocusedInput)) {
+        alert("時間を入力したいテキストボックスを一度クリックして選択してください。");
+        return;
+    }
+
+    const currentTime = mediaPlayer.currentTime || 0;
+    const formattedTime = formatTime(currentTime);
+    
+    // 選択中のボックスに時間を入力
+    lastFocusedInput.value = formattedTime;
+    
+    // 入力時の視覚的フィードバック
+    const originalBg = lastFocusedInput.style.backgroundColor;
+    lastFocusedInput.style.backgroundColor = '#d4edda';
+    setTimeout(() => {
+        lastFocusedInput.style.backgroundColor = originalBg;
+    }, 300);
+
+    const currentRow = lastFocusedInput.closest('.srt-row');
+
+    // 「開始時間」のボックスだった場合の処理
+    if (lastFocusedInput.classList.contains('start-time')) {
         
-        // 入力後、少しハイライトして視覚的なフィードバックを与える
-        const originalBg = lastFocusedInput.style.backgroundColor;
-        lastFocusedInput.style.backgroundColor = '#d4edda';
-        setTimeout(() => {
-            lastFocusedInput.style.backgroundColor = originalBg;
-        }, 300);
-    } else {
-        alert("時間を入力したい開始時間・終了時間のテキストボックスを一度クリックして選択してください。");
+        // 1. 前の行があれば、前の行の終了時間に同じ時間を自動入力する
+        const prevRow = currentRow.previousElementSibling;
+        if (prevRow && prevRow.classList.contains('srt-row')) {
+            const prevEnd = prevRow.querySelector('.end-time');
+            prevEnd.value = formattedTime;
+        }
+
+        // 2. 次の行の開始時間へフォーカスを自動で移す
+        let nextRow = currentRow.nextElementSibling;
+        
+        // 次の行がない場合は新しい行を自動的に追加する
+        if (!nextRow || !nextRow.classList.contains('srt-row')) {
+            addRow();
+            nextRow = currentRow.nextElementSibling;
+        }
+
+        if (nextRow) {
+            const nextStart = nextRow.querySelector('.start-time');
+            nextStart.focus();
+        }
+        
+    } 
+    // 「終了時間」のボックスだった場合は単独更新のみ（次の行はいじらずフォーカス移動もしない）
+    else if (lastFocusedInput.classList.contains('end-time')) {
+        // 何もしない
     }
 }
 
-// 5. SRTファイルの生成とダウンロード
+// 6. プレビュー機能（再生時間に応じたハイライト）
+mediaPlayer.addEventListener('timeupdate', () => {
+    const currentSec = mediaPlayer.currentTime;
+    const rows = editor.querySelectorAll('.srt-row');
+    
+    rows.forEach(row => {
+        const startStr = row.querySelector('.start-time').value;
+        const endStr = row.querySelector('.end-time').value;
+        const startSec = parseTime(startStr);
+        const endSec = parseTime(endStr);
+        
+        // 開始時間と終了時間の間に現在時間がある場合にハイライト
+        if (startSec <= currentSec && currentSec < endSec) {
+            row.classList.add('highlight');
+        } else {
+            row.classList.remove('highlight');
+        }
+    });
+});
+
+// 7. SRTファイルの生成とダウンロード
 function downloadSRT() {
     const rows = editor.querySelectorAll('.srt-row');
     if (rows.length === 0) {
@@ -158,7 +220,6 @@ function downloadSRT() {
     rows.forEach((row, index) => {
         const start = row.querySelector('.start-time').value.trim() || '00:00:00,000';
         const end = row.querySelector('.end-time').value.trim() || '00:00:00,000';
-        // 空白文字（全角スペース等）もそのまま保持
         const text = row.querySelector('.text-input').value || ' '; 
 
         srtOutput += `${index + 1}\n`;
@@ -166,7 +227,6 @@ function downloadSRT() {
         srtOutput += `${text}\n\n`;
     });
 
-    // BOM付きUTF-8でBlobを作成（文字化け防止）
     const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
     const blob = new Blob([bom, srtOutput], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
