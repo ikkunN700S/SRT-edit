@@ -237,3 +237,24 @@ input.time-mismatch {
 .btn-large-time:active {
     transform: scale(0.95);
 }
+
+footer {
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #999;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0px;
+}
+
+footer p {
+    margin: 0;
+}
+
+footer #site-version {
+    color: #888;
+    margin-top: 5px;
+}
