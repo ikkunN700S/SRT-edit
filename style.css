@@ -2,6 +2,7 @@
     --primary-color: #007bff;
     --secondary-color: #6c757d;
     --success-color: #28a745;
+    --info-color: #17a2b8; /* SBVボタン用の色を追加 */
     --danger-color: #dc3545;
     --bg-color: #f8f9fa;
     --border-color: #dee2e6;
@@ -22,7 +23,6 @@ body {
     padding: 20px 30px;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    /* 巨大ボタンに最下部の行が隠れないように余白をかなり大きめに確保 */
     margin-bottom: 150px; 
 }
 
@@ -91,6 +91,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--primary-color); color: white; }
 .btn-secondary { background: var(--secondary-color); color: white; }
 .btn-success { background: var(--success-color); color: white; width: 100%; font-size: 16px; padding: 15px;}
+.btn-info { background: var(--info-color); color: white; width: 100%; font-size: 16px; padding: 15px;}
 .btn-danger { background: var(--danger-color); color: white; padding: 6px 10px;}
 
 .editor-header {
@@ -176,11 +177,13 @@ input.time-mismatch {
     font-weight: bold;
 }
 
+/* 2つのボタンを並べるレイアウト */
 .export-section {
     margin-top: 30px;
+    display: flex;
+    gap: 15px;
 }
 
-/* 画面右下の再生・一時停止ボタン */
 .floating-controls {
     position: fixed;
     bottom: 20px;

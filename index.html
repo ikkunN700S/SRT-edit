@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SRT同期歌詞エディタ</title>
+    <title>SRT / SBV 同期歌詞エディタ</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>SRT同期歌詞エディタ</h1>
+        <h1>SRT / SBV 同期歌詞エディタ</h1>
 
         <div class="control-panel">
             <div class="panel-section">
@@ -17,8 +17,8 @@
                 <audio id="mediaPlayer" controls></audio>
             </div>
             <div class="panel-section">
-                <h3>2. 歌詞ファイル（SRT / TXT）の読み込み</h3>
-                <input type="file" id="srtInput" accept=".srt,.txt,text/plain">
+                <h3>2. 歌詞ファイル（SRT / SBV / TXT）の読み込み</h3>
+                <input type="file" id="srtInput" accept=".srt,.sbv,.txt,text/plain">
                 <p style="font-size: 12px; color: #666; margin-top: 10px;">
                     ※TXTファイルは1行ずつ改行を保持して読み込まれます。
                 </p>
@@ -42,11 +42,12 @@
         </div>
         
         <div id="editor" class="editor-container">
-            <!-- ここにSRTの行データが追加されます -->
+            <!-- ここに行データが追加されます -->
         </div>
 
         <div class="export-section">
-            <button id="downloadBtn" class="btn-success">💾 SRTファイルをダウンロード</button>
+            <button id="downloadSrtBtn" class="btn-success">💾 SRTファイルを出力</button>
+            <button id="downloadSbvBtn" class="btn-info">💾 SBVファイルを出力</button>
         </div>
     </div>
 
