@@ -143,26 +143,36 @@ function parseSRT(content) {
     });
 }
 
-// SBVの解析
 function parseSBV(content) {
     srtData = [];
     const blocks = content.replace(/\r\n/g, '\n').split(/\n{2,}/);
+    
+    // 直前の終了時間を記録（0秒からスタート）
+    let lastEndTime = '00:00:00,000'; 
+
     blocks.forEach(block => {
         const lines = block.trim().split('\n');
         if (lines.length >= 2) {
-            // 例: 0:00:09.932,0:00:12.442
             const timeMatch = lines[0].match(/(\d+:\d{2}:\d{2}\.\d{1,3}),(\d+:\d{2}:\d{2}\.\d{1,3})/);
             if (timeMatch) {
                 const start = formatSBVTimeToSRT(timeMatch[1]);
                 const end = formatSBVTimeToSRT(timeMatch[2]);
                 const text = lines.slice(1).join('\n');
+
+                // 直前の終了時間と現在の開始時間にギャップがあれば、その間を空行で埋める
+                if (lastEndTime !== start) {
+                    srtData.push({ start: lastEndTime, end: start, text: '' });
+                }
+
                 srtData.push({ start: start, end: end, text: text });
+                
+                // 次のループのために終了時間を更新
+                lastEndTime = end; 
             }
         }
     });
 }
 
-// 内部エディタ用に H:MM:SS.mmm を HH:MM:SS,mmm に変換
 function formatSBVTimeToSRT(sbvTime) {
     let [hms, ms] = sbvTime.split('.');
     let parts = hms.split(':');
@@ -172,11 +182,10 @@ function formatSBVTimeToSRT(sbvTime) {
     return `${h}:${m}:${s},${ms.padEnd(3, '0')}`;
 }
 
-// 出力用に HH:MM:SS,mmm を H:MM:SS.mmm に変換
 function formatSRTTimeToSBV(srtTime) {
     let [hms, ms] = srtTime.split(',');
     let parts = hms.split(':');
-    let h = parseInt(parts[0], 10).toString(); // 先頭のゼロを省く
+    let h = parseInt(parts[0], 10).toString();
     let m = parts[1];
     let s = parts[2];
     return `${h}:${m}:${s}.${ms}`;
@@ -426,7 +435,6 @@ mediaPlayer.addEventListener('timeupdate', () => {
     });
 });
 
-// ファイル出力処理（SRT・SBV共通関数）
 function downloadFile(type) {
     const rows = editor.querySelectorAll('.srt-row');
     if (rows.length === 0) {
@@ -442,12 +450,11 @@ function downloadFile(type) {
         let text = row.querySelector('.text-input').value || ''; 
 
         if (type === 'srt') {
-            if (text === '') text = ' '; // SRTでは空行対策
+            if (text === '') text = ' '; 
             output += `${index + 1}\n`;
             output += `${start} --> ${end}\n`;
             output += `${text}\n\n`;
         } else if (type === 'sbv') {
-            // SBVは字幕のない空白時間をスキップする
             if (text.trim() === '') return;
             const sbvStart = formatSRTTimeToSBV(start);
             const sbvEnd = formatSRTTimeToSBV(end);
